@@ -1,22 +1,21 @@
 
+from pickle import FALSE
 from numpy import argmax
 import numpy as np
 import numpy.random as rnd
 import matplotlib.pyplot as plt
-from env import environment, rewards, UP, DOWN, LEFT, RIGHT, FREE,WALL,PACKAGE,DROPOFF
+from old_qlearn_stuff.env import environment, rewards, UP, DOWN, LEFT, RIGHT, FREE,WALL,PACKAGE,DROPOFF
 import heapq
+from typing import final
 # import imageio
 
 
-class pathfinder():
+class dijkstra_pathfinder():
     def __init__(
             self,
             env:environment,
             ):
         self.env = env
-        self.current_goal = None
-        self.current_path = []
-        self.current_steps = 0
         #eight neighbours
         self.NEIGHBOURS = [(0,1,1),(0,-1,1),(1,0,1),(-1,0,1),
               (1,1,np.sqrt(2)),(-1,-1,np.sqrt(2)),(-1,1,np.sqrt(2)),(1,-1,np.sqrt(2))]
@@ -25,13 +24,15 @@ class pathfinder():
         return w
 
     def not_in_bounds(self,x,y):
-        if x > self.env.width or y > self.env.height:
+        if x > (self.env.width -1) or y > (self.env.height -1) or x <0 or y < 0:
             return True
         else:
             return False
 
-    def dijkstra_path(self,start_x,start_y,goal_x,goal_y,):
-        
+    def dijkstra_path(self,start:tuple[int,int],goal:tuple[int,int]):
+        start_x, start_y = start
+        goal_x, goal_y = goal
+
         INF = float('inf')
         env = self.env
 
@@ -50,7 +51,7 @@ class pathfinder():
 
             for (dx, dy , w ) in self.NEIGHBOURS:
                 nx,ny = x+dx,y+dy
-                if self.not_in_bounds(nx,ny,env):continue
+                if self.not_in_bounds(nx,ny):continue
                 if env.grid[nx,ny] == WALL:continue
 
                 step_cost = self.cost_fn(x,y,nx,ny,w)
@@ -81,8 +82,47 @@ class pathfinder():
         return None
     
 
+@final
+class dijkstra_agent(dijkstra_pathfinder):
+    def __init__(self,env:environment):
+        super().__init__(env)
+        self.num_points = 0
+        self.target : tuple[int,int] = (0,0)
+        self.pos : tuple[int,int] = (0,0)
+        self.is_carrying :bool = False
+        self.path = []
+        self.colour = 'red'
+        self.done = False
+
+    def change_colour_to_blue(self):
+        self.colour = 'blue'
+
+    def change_colour_to_red(self):
+        self.colour = 'red'
         
 
+    def find_target_and_set_course(self):
+
+        if self.is_carrying:
+            self.change_colour_to_blue(self)
+            self.target = self.env.drop_off
+        else:
+            self.target = self.env.package
+
+        dist,parent = self.dijkstra_path(self.pos,self.target)
+        self.path = self.reconstruct_path(parent,self.pos,self.target)
+
+
+
+    def get_state(self):
+        return (self.pos,self.target,self.is_carrying)
+    
+    def step_along_path(self):
+        if len(self.path) != 0:   
+            self.pos = self.path[1] #is the next step in the pat
+        else:
+            print(f"at end of path   target: {self.target}  |   pos: {self.pos}  |  steps along path: {self.steps_along_path}  |  path len: {len(self.path)}")
+            self.is_carrying = True
 
 
 
@@ -93,16 +133,5 @@ class pathfinder():
 
 
 
-
-
-
-
-
-
-
-if __name__ == "__main__":
-    env = environment(width = 12,height = 12, package_location=(4,4), dropoff_location=(0,0))
-    dist,parent = dijkstra_path(0,0,4,4,cost_fn,env)
-    print(reconstruct_path(parent,(0,0),(4,4)))
 
 
